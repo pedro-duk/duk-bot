@@ -1,6 +1,6 @@
 # duk-bot
 ## Informações gerais
-* <b> Objetivo: </b> criação de um bot de Discord capaz de realizar funcionalidades interessantes para servidores.
+* <b> Objetivo: </b> criação de um bot de Discord capaz de realizar funcionalidades interessantes para meu servidor pessoal.
 
 ## Funcionalidades
 * Registro de informações dos usuários do servidor usando MongoDB;
