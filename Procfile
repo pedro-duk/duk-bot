@@ -1,0 +1,1 @@
+worker: npm run giveperm && npm run start

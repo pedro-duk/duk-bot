@@ -1,0 +1,29 @@
+{
+  "name": "pedrosilva-dukbot",
+  "version": "1.0.0",
+  "main": "bot.js",
+  "scripts": {
+    "start": "node bot.js",
+    "giveperm": "chmod u+x ./executaveis/loud_detector"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "async": "^3.2.4",
+    "child_process": "^1.0.2",
+    "discord.js": "^12.5.3",
+    "dotenv": "^8.6.0",
+    "ffmpeg": "0.0.4",
+    "mongodb": "^3.6.9",
+    "newrelic": "^7.5.0",
+    "node-fetch": "^2.6.7",
+    "owoify-js": "^1.0.7",
+    "owoifyx": "^1.0.1",
+    "relic": "^0.2.0",
+    "seedrandom": "^3.0.5",
+    "twit": "^2.2.11"
+  },
+  "devDependencies": {},
+  "description": ""
+}
