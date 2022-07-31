@@ -1,6 +1,6 @@
 node_modules/
+config/
+testes/
 package-lock.json
 logs.sh
 update.sh
-testes/
-config/

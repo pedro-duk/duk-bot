@@ -14,6 +14,7 @@ const mdb = require('./funcoes/mongodb.js');
 // JSONs de configuração
 const botconfig = require('./config/botconfig.json');
 const canais = require('./config/canais.json');
+const { Console } = require('console');
 
 /**
  * Definições
@@ -44,7 +45,8 @@ let prefix = botconfig.prefix;
 /** Comandos do chat geral */
 const comandos = {
 	'owo': ": Owoifa uma mensagem.",
-	'niver': ": Registra o seu aniversário. O ano de nascimento é opcional. Exemplo: d.niver 15/09/1997 ou d.niver 15/09"
+	'niver': ": Registra o seu aniversário. O ano de nascimento é opcional. Exemplo: d.niver 15/09/1997 ou d.niver 15/09",
+	'setcanalniver': ": (ADMIN ONLY) Define canal para aniversários."
 };
 
 /** Comandos do chat privado */
@@ -77,10 +79,12 @@ client.on('ready', async () => {
 	funcgerais.agendaFuncao(6, 0, funcgerais.enviaVideo, client, path3manha, canais.geral);
 
 	/** Agendando para pesquisar aniversários às 9 da manhã. */
-	funcgerais.agendaFuncao(12, 0, mdb.checaAniversario, client, pathGifsNiver, canais.geral);
+	funcgerais.agendaFuncao(12, 0, mdb.checaAniversario, client);
 
 	/** Log enviado no canal de logs, indicando que o bot foi inicializado corretamente. */
 	funcgerais.enviaLog(client, canais.logs, "Bot inicializado!", "", corazul);
+
+	mdb.checaAniversario(client);
 });
 
 // Usuário enviou uma mensagem
@@ -180,6 +184,19 @@ client.on('message', async message => {
 		return message.channel.send(strnova);
 	}
 
+	// SETCANALNIVER (só admins)
+	if (cmd === `${prefix}setcanalniver`) {
+		if(message.member.permissionsIn(message.channel).has("ADMINISTRATOR")) {
+			await mdb.adicionaAtualizaServer(message.guild.id, message.channel.id);
+
+			return message.channel.send('Canal atual definido como canal de aniversários!');
+		}
+
+		else {
+			return message.channel.send("Comando somente para administradores.");
+		}
+	}
+
 	// owoifyier
 	if (cmd === `${prefix}owo`) {
 		var strnova = '';
@@ -230,7 +247,10 @@ client.on('message', async message => {
 
 		await mdb.checkConnection();
 
-		var aux = await mdb.criaAtualizaUser(idautor, message.member.user.tag.toString(), dia, mes, ano);
+		var taguser = message.member.user.tag.toString();
+		var guild = message.guild.id;
+
+		var aux = await mdb.criaAtualizaUser(idautor, taguser, guild, dia, mes, ano);
 		
 		if(aux == 0) { // Não existia usuário antes
 			var msg = 'Aniversário definido para ' + dia + "/" + mes;
@@ -252,8 +272,13 @@ client.on('message', async message => {
 			return message.channel.send(msg);
 		}
 
-		else { // Deu erro na inserção
-			return message.channel.send('Erro na inserção! Por favor contate o duk.');
+		else if (aux == -1) { // Server não existe
+			return message.channel.send('Canal de aniversários não foi definido. Algum administrador deve definir com ' + prefix + "setcanalniver");
+		}
+
+		else { // Erro na inserção
+			Console.log("Erro na inserção de um usuário.");
+			return message.channel.send("Erro na inserção! Contate o duk.");
 		}
 	}
 

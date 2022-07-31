@@ -60,7 +60,7 @@ function checaAlto(url) {
 }
 
  /* Agenda uma chamada de função na hora especificada por time */
-async function agendaFuncao(horas, minutos, funcaoChamada, client, path, canal) {
+async function agendaFuncao(horas, minutos, funcaoChamada, ...args) {
 	/** Checando se horas e minutos são válidos */
 	/** Checando se são inteiros */
 	if(!Number.isInteger(horas) || !Number.isInteger(minutos)) {
@@ -85,12 +85,12 @@ async function agendaFuncao(horas, minutos, funcaoChamada, client, path, canal) 
 	const primeiraChamada = dif;
 
 	/** Faz uma chamada inicial usando primeiraChamada, depois define que será chamada ciclicamente
-	 * a cada 24 horas.
+	 * 	a cada 24 horas.
 	 */
 	setTimeout(function () {
-		funcaoChamada(client, path, canal);
+		funcaoChamada(...args);
 		setInterval(function () {
-			funcaoChamada(client, path, canal);
+			funcaoChamada(...args);
 		}, 24 * 60 * 60 * 1000);
 	}, primeiraChamada);
 }

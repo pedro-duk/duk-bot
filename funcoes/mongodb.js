@@ -2,6 +2,7 @@
  * Bibliotecas
  */
 
+const { Console } = require('console');
 const fs = require('fs');
 const {	MongoClient } = require('mongodb');
 const mdbconfig = require('../config/mongoconfig.json');
@@ -11,12 +12,13 @@ const funcgerais = require('./funcgerais.js')
  * Variáveis locais
  */
 
-const strdb 		= mdbconfig.strdb;
-const struserinfo 	= mdbconfig.struserinfo;
-const uri 			= mdbconfig.uri;
-const tempoClose 	= mdbconfig.tempoClose;
-var controlaClose 	= undefined;
-var dbclient 		= undefined;
+const strdb 			= mdbconfig.strdb;
+const strusersinfo 		= mdbconfig.strusersinfo;
+const strserversinfo 	= mdbconfig.strserversinfo;
+const uri 				= mdbconfig.uri;
+const tempoClose 		= mdbconfig.tempoClose;
+var controlaClose 		= undefined;
+var dbclient 			= undefined;
 
 /**
  * Funções Exportadas
@@ -25,7 +27,6 @@ var dbclient 		= undefined;
 // Checa se conexão ao DB está aberta, e abre se não estiver
 async function checkConnection() {
 	if (controlaClose != undefined) {
-		//console.log("Reiniciando tempo de acesso ao DB...");
 		clearTimeout(controlaClose);
 	}
 
@@ -36,12 +37,79 @@ async function checkConnection() {
 	}
 }
 
-// Criação ou atualização de usuários. Se retornar 0, criou usuário. Se retornar 1, atualizou.
-// 	Se retornar -1, deu erro.
-async function criaAtualizaUser(idx, tagx, dianiver, mesniver, anoniver) {
-	var aux = await procuraUser(idx);
+// Procura se existe usuário com ID dado
+async function procuraUser(id) {
+	return findOneListingById(dbclient, strusersinfo, id);
+}
+
+// Procura se existe server com ID dado
+async function procuraServer(id) {
+	return findOneListingById(dbclient, strserversinfo, id);
+}
+
+// Procura se existe um usuário associado a um server
+async function procuraUserEmServer(iduser, idserver) {
+	var aux = await procuraServer(idserver);
+	var aux2 = aux.users.includes(iduser);
+	return aux2;
+}
+
+// Adiciona ou atualiza server no DB.
+async function adicionaAtualizaServer(idserver, canal_niver) {
+	// Checa se já existe canal
+	const resultExiste = await procuraServer(idserver);
+
+	if(resultExiste == undefined) { // Não existe server
+		const result = await createListing(dbclient, strserversinfo, {
+			_id: idserver,
+			users: [],
+			canal_niver: canal_niver
+		});
+	
+		if(result == undefined) { // Erro na inserção!
+			Console.log("Erro na inserção de um servidor em serversinfo.");
+		}
+	}
+
+	else { // Já existia server
+		const result = await updateListingById(dbclient, strserversinfo, idserver, {
+			_id: idserver,
+			canal_niver: canal_niver
+		});
+
+		if(result == undefined) { // Erro na atualização
+			Console.log("Erro na atualização de um servidor em serversinfo.");
+		}
+	}
+}
+
+// Criação ou atualização de usuários.
+//	Valores de retorno:
+//		0: usuário não existia, foi criado e adicionado.
+//		1: usuário já existia, foi atualizado.
+//		-1: server não existe. Deve ser criado antes.
+//		-2: erro na inserção do usuário.
+async function criaAtualizaUser(idx, tagx, idserver, dianiver, mesniver, anoniver) {
+	await checkConnection();
+	/** 
+	 * Primeiro, adicionar usuários em serverinfo
+	 */
+
+	var result = await procuraServer(idserver);
+
+	if(result == undefined) { // Server não existe!
+		return -1;
+	}
+
+	// Server existe, agora devemos inserir usuário na lista de usuários.
+	await adicionaUser(idx, idserver);
+	
+	/** 
+	 * Agora, adicionar usuários em userinfo
+	 */
+	aux = await procuraUser(idx);
 	if (aux == undefined) { // Não existe, deve ser criado!
-		const result = await createListing(dbclient, struserinfo, {
+		const result = await createListing(dbclient, strusersinfo, {
 			_id: idx,
 			tagnome: tagx,
 			dianiver: dianiver,
@@ -49,15 +117,15 @@ async function criaAtualizaUser(idx, tagx, dianiver, mesniver, anoniver) {
 			anoniver: anoniver
 		});
 
-		if(result == undefined) {// Erro na inserção!
-			return -1;
+		if(result == undefined) { // Erro na inserção!
+			return -2;
 		}
 
 		return 0;
 	}
 
 	else {
-		const result = await updateListingById(dbclient, struserinfo, idx, { // Já existia, deve ser updatado!
+		const result = await updateListingById(dbclient, strusersinfo, idx, { // Já existia, deve ser updatado!
 			_id: idx,
 			tagnome: tagx,
 			dianiver: dianiver,
@@ -65,51 +133,83 @@ async function criaAtualizaUser(idx, tagx, dianiver, mesniver, anoniver) {
 			anoniver: anoniver
 		})
 
-		if(result == undefined) {// Erro na inserção!
-			return -1;
+		if(result == undefined) { // Erro na inserção!
+			return -2;
 		}
 	
 		return 1;
 	}
 }
 
+// Adiciona usuário em um server. Presume-se que idserver existe.
+async function adicionaUser(iduser, idserver) {
+	await checkConnection();
+
+	if(!(await procuraUserEmServer(iduser, idserver))) { // Usuário ainda não adicionado
+		// Inserir no array users!
+		await dbclient.db(strdb).collection(strserversinfo).updateOne(
+			{ _id: idserver },
+			{ $push: { users: iduser } }
+		);
+	}
+}
+
 // Função para checar se existe um aniversário no dia, e imprimir uma mensagem caso exista.
-async function checaAniversario(client, path, canal) {
+async function checaAniversario(discordclient) {
+	await checkConnection();
+
 	const date = new Date();
 	var diaatual = date.getDate();
 	var mesatual = date.getMonth() + 1;
 	var anoatual = date.getFullYear();
 
+	// Coleção de todos os usuários fazendo aniversário no dia atual
 	const cursorUsuarios = await procuraNiverUser(diaatual, mesatual);
 
-	if (await cursorUsuarios.count() != 0) {
-		// Enviando mensagem de feliz aniversário!
-		var canalfelizniver = await client.channels.fetch(canal);
+	if (await cursorUsuarios.count() != 0) { // Alguém faz aniversário hoje!
+		// Coleção de todos os servidores
+		const cursorServers = await dbclient.db(strdb).collection(strserversinfo).find();
 
-		//funcgerais.enviaVideoAleatorioPasta(client, path, canal);
+		// Para cada servidor...
+		await cursorServers.forEach(async function(server) {
 
-		var mensagemEnviada = "**HOJE TEM ANIVERSARIANTEEEE!!** \n";
+			var alguemFazNiver = false;
+			var mensagemEnviada = "**HOJE TEM ANIVERSARIANTEEEE!!** \n";
 
-		await cursorUsuarios.forEach(function(usuario) {
-			mensagemEnviada += '<@' + usuario._id + '>';
+			// Para cada usuário que faz niver...
+			await cursorUsuarios.forEach(function(usuario) {
 
-			if(usuario.anoniver != -1) {
-				var idade = anoatual - usuario.anoniver;
+				// Caso usuário pertença ao servidor, concatenar em mensagemEnviada!
+				if(procuraUserEmServer(usuario._id, server._id)) { // Usuário pertence ao server!
+					// Concatenando em mensagemEnviada
+					mensagemEnviada += '<@' + usuario._id + '>';
 
-				mensagemEnviada += ", comemorando " + idade.toString() + " anos!";
+					if(usuario.anoniver != -1) {
+						var idade = anoatual - usuario.anoniver;
+
+						mensagemEnviada += ", comemorando " + idade.toString() + " anos!";
+					}
+					mensagemEnviada += "\n";
+
+					alguemFazNiver = true;
+				}
+			});
+
+			// Enviar mensagemEnviada no canal de niver do servidor.
+			if (alguemFazNiver) {
+				var canalfelizniver = await discordclient.channels.fetch(server.canal_niver);
+
+				canalfelizniver.send(mensagemEnviada);
 			}
-			mensagemEnviada += "\n";
 		});
-
-		canalfelizniver.send(mensagemEnviada);
 	}
 }
 
 // Procura se existe usuário com aniversário no dia dado
 async function procuraNiverUser(dianiver, mesniver) {
-	checkConnection();
+	await checkConnection();
 
-	const result = await dbclient.db(strdb).collection(struserinfo)
+	const result = await dbclient.db(strdb).collection(strusersinfo)
 		.find({
 			dianiver: dianiver,
 			mesniver: mesniver
@@ -118,16 +218,10 @@ async function procuraNiverUser(dianiver, mesniver) {
 	return result;
 }
 
-// Procura se existe usuário com ID dado
-async function procuraUser(id) {
-	return findOneListingById(dbclient, struserinfo, id);
-}
-
 
 exports.checkConnection = checkConnection;
+exports.adicionaAtualizaServer = adicionaAtualizaServer;
 exports.criaAtualizaUser = criaAtualizaUser;
-exports.procuraNiverUser = procuraNiverUser;
-exports.procuraUser = procuraUser;
 exports.checaAniversario = checaAniversario;
 
 
@@ -160,7 +254,7 @@ function closeConnection() {
 
 // Cria uma lista no DB
 async function createListing(client, colecao, newListing) {
-	checkConnection();
+	await checkConnection();
 
 	const result = await client.db(strdb).collection(colecao).insertOne(newListing);
 
@@ -173,7 +267,7 @@ async function createListing(client, colecao, newListing) {
 
 // Procura uma lista no DB
 async function findOneListingById(client, colecao, idsearch) {
-	checkConnection();
+	await checkConnection();
 
 	const result = await client.db(strdb).collection(colecao)
 		.findOne({
@@ -189,9 +283,9 @@ async function findOneListingById(client, colecao, idsearch) {
 
 // Atualiza uma lista no DB
 async function updateListingById(client, colecao, idOfListing, updatedListing) {
-	checkConnection();
+	await checkConnection();
 
-	result = await client.db(strdb).collection(colecao)
+	const result = await client.db(strdb).collection(colecao)
 		.updateOne({
 			_id: idOfListing
 		}, {
