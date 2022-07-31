@@ -6,7 +6,7 @@ const { Console } = require('console');
 const fs = require('fs');
 const {	MongoClient } = require('mongodb');
 const mdbconfig = require('../config/mongoconfig.json');
-const funcgerais = require('./funcgerais.js')
+const funcgerais = require('./funcgerais.js');
 
 /**
  * Variáveis locais
@@ -67,7 +67,7 @@ async function adicionaAtualizaServer(idserver, canal_niver) {
 		});
 	
 		if(result == undefined) { // Erro na inserção!
-			Console.log("Erro na inserção de um servidor em serversinfo.");
+			console.log("Erro na inserção de um servidor em serversinfo.");
 		}
 	}
 
@@ -78,7 +78,7 @@ async function adicionaAtualizaServer(idserver, canal_niver) {
 		});
 
 		if(result == undefined) { // Erro na atualização
-			Console.log("Erro na atualização de um servidor em serversinfo.");
+			console.log("Erro na atualização de um servidor em serversinfo.");
 		}
 	}
 }
@@ -165,27 +165,38 @@ async function checaAniversario(discordclient) {
 
 	// Coleção de todos os usuários fazendo aniversário no dia atual
 	const cursorUsuarios = await procuraNiverUser(diaatual, mesatual);
+	var listaUsuariosNiver = new Map();
 
-	if (await cursorUsuarios.count() != 0) { // Alguém faz aniversário hoje!
-		// Coleção de todos os servidores
-		const cursorServers = await dbclient.db(strdb).collection(strserversinfo).find();
+	// Adicionando todos na listaUsuariosNiver
+	await cursorUsuarios.forEach(async function(usuario) {
+		listaUsuariosNiver.set(usuario._id, usuario.anoniver);
+	});
 
+	// Coleção de todos os servidores, com todos os usuários
+	const cursorServers = await dbclient.db(strdb).collection(strserversinfo).find();
+	var listaServers = new Map();
+
+	// Adicionando todos. Server.users é um array
+	await cursorServers.forEach(async function(server) {
+		listaServers.set(server._id, server.users);
+	});
+
+	// Checando se alguém faz aniversário hoje
+	if (listaUsuariosNiver.length != 0) { // Alguém faz aniversário hoje!
 		// Para cada servidor...
-		await cursorServers.forEach(async function(server) {
-
+		listaServers.forEach(async function(arrayusers, idserver) {
 			var alguemFazNiver = false;
 			var mensagemEnviada = "**HOJE TEM ANIVERSARIANTEEEE!!** \n";
 
 			// Para cada usuário que faz niver...
-			await cursorUsuarios.forEach(function(usuario) {
-
+			listaUsuariosNiver.forEach(function(anoniver, idusuario) {
 				// Caso usuário pertença ao servidor, concatenar em mensagemEnviada!
-				if(procuraUserEmServer(usuario._id, server._id)) { // Usuário pertence ao server!
+				if(arrayusers.includes(idusuario)) { // Usuário pertence ao server!
 					// Concatenando em mensagemEnviada
-					mensagemEnviada += '<@' + usuario._id + '>';
+					mensagemEnviada += '<@' + idusuario + '>';
 
-					if(usuario.anoniver != -1) {
-						var idade = anoatual - usuario.anoniver;
+					if(anoniver != -1) {
+						var idade = anoatual - anoniver;
 
 						mensagemEnviada += ", comemorando " + idade.toString() + " anos!";
 					}
@@ -197,7 +208,10 @@ async function checaAniversario(discordclient) {
 
 			// Enviar mensagemEnviada no canal de niver do servidor.
 			if (alguemFazNiver) {
-				var canalfelizniver = await discordclient.channels.fetch(server.canal_niver);
+				var aux = await findOneListingById(dbclient, strserversinfo, idserver);
+				var idcanalfelizniver = aux.canal_niver;
+
+				var canalfelizniver = await discordclient.channels.fetch(idcanalfelizniver);
 
 				canalfelizniver.send(mensagemEnviada);
 			}

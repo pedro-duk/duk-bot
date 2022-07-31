@@ -6,8 +6,17 @@ const Discord = require('discord.js');
 const { off } = require('process');
 const path = require('path');
 
+
+// Opções para detecção de mídia alta
+var peakmidia = '-3';
+var average = '-7';
+var windowmidia = '50';
+
+opcoesmidiaalta = [];
+opcoesmidiaalta.push('-average', average, '-peak', peakmidia, '-window', windowmidia, '--boolean-output', '--disable-sudden', '--disable-average');
+
 // Executáveis usados
-const pathLoudDetector = './../executaveis/loud_detector';
+const pathLoudDetector = './executaveis/loud_detector';
 
 function owoify(str) {
 	var replaces = {

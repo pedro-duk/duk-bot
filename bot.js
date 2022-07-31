@@ -25,14 +25,6 @@ var corazul = '#3366ff';
 var corvermelha = '#ff3300';
 var corbranca = '#ffffff';
 
-// Opções para detecção de mídia alta
-var peakmidia = '-3';
-var average = '-7';
-var windowmidia = '50';
-
-opcoesmidiaalta = [];
-opcoesmidiaalta.push('-average', average, '-peak', peakmidia, '-window', windowmidia, '--boolean-output', '--disable-sudden', '--disable-average');
-
 // Mídia
 const pathmimir = "./imagens/mimir/";
 const path3manha = './imagens/outros/3damanha.mp4';
@@ -83,8 +75,6 @@ client.on('ready', async () => {
 
 	/** Log enviado no canal de logs, indicando que o bot foi inicializado corretamente. */
 	funcgerais.enviaLog(client, canais.logs, "Bot inicializado!", "", corazul);
-
-	mdb.checaAniversario(client);
 });
 
 // Usuário enviou uma mensagem
